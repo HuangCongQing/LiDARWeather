@@ -259,10 +259,9 @@ class RandomFlip3D(RandomFlip):
         repr_str += f' flip_ratio_bev_vertical={self.flip_ratio_bev_vertical})'
         return repr_str
 
-
 @TRANSFORMS.register_module()
 class RandomRangeJitterPoints(BaseTransform):
-    """Randomly jitter point coordinates.
+    """Randomly jitter point coordinates.随机增强（无DSJ, ASJ）
     Apply jittering to regions that DSJ, ASJ is not applied.
 
     Args:
@@ -2712,7 +2711,7 @@ class LaserMix(BaseTransform):
 
 @TRANSFORMS.register_module()
 class DepthSelectiveJitter(BaseTransform):
-    """DepthSelectiveJitter data augmentation.
+    """DepthSelectiveJitter data augmentation. DSJ
 
     The DepthSelectiveJitter transform steps are as follows:
 
@@ -2877,7 +2876,7 @@ class DepthSelectiveJitter(BaseTransform):
 
 @TRANSFORMS.register_module()
 class AngleSelectiveJitter(BaseTransform):
-    """AngleSelectiveJitter data augmentation.
+    """AngleSelectiveJitter data augmentation. ASJ
 
     The AngleSelectiveJitter transform steps are as follows:
 

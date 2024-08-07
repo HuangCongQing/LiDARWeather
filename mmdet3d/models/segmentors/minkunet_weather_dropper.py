@@ -93,6 +93,7 @@ class MinkUNetWeatherDropper(EncoderDecoder3D):
         self.n_observations = n_observations
         self.n_actions = n_actions
 
+        # DQN
         self.policy_net = DQN(n_observations, n_actions)
         self.target_net = DQN(n_observations, n_actions)
         self.target_net.load_state_dict(self.policy_net.state_dict())
@@ -133,6 +134,7 @@ class MinkUNetWeatherDropper(EncoderDecoder3D):
         mean_increase = current_loss_unc - last_loss_unc
         return mean_increase
 
+    # 
     def select_action(self, state, points):
         """Return the point index to drop based on epsilon-greedy strategy."""
         # global steps_done
@@ -241,21 +243,25 @@ class MinkUNetWeatherDropper(EncoderDecoder3D):
                     'loss' : loss_decode['decode.loss_ce'],
                     'uncertainty' : torch.mean(torch.sum(-logits_softmax*torch.log(logits_softmax + 1e-8), dim=1)),
                 }
+                # 调用
                 batch_inputs_dict_drop, batch_data_samples_drop, action, state = self.get_drop_points(self.cache)
             voxel_dict_drop = self.extract_feat(batch_inputs_dict_drop)
             loss_drop = self._decode_head_forward_train(voxel_dict_drop, batch_data_samples_drop)
             loss_drop = rename_loss_dict('drop_', loss_drop)
+            # add loss1
             losses.update(loss_drop)
             with torch.no_grad():
                 logits_softmax_drop = F.softmax(self.decode_head(voxel_dict_drop)['logits'], dim=1)
                 uncertainty_drop = torch.mean(torch.sum(-logits_softmax_drop*torch.log(logits_softmax_drop + 1e-8), dim=1))
                 next_state = torch.tensor([loss_drop['drop_decode.loss_ce'], uncertainty_drop], device=batch_inputs_dict['points'][0].device).reshape(1, -1)
+                # 计算奖励
                 reward = self.calculate_reward(loss_decode['decode.loss_ce'], loss_drop['drop_decode.loss_ce'])
                 self.memory.push(state, action, next_state, reward) # Update memory
 
             # Policy net update
             if len(self.memory) > self.BATCH_SIZE:
                 loss_policy = self.update_policy_net(batch_inputs_dict)
+                # add loss2
                 losses.update(loss_policy)
         return losses
     

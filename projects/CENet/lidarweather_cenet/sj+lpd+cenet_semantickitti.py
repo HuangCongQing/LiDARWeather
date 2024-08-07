@@ -331,7 +331,7 @@ model = dict(
             indices=4)
     ],
     train_cfg=dict(
-        learnable_drop=learnable_drop,
+        learnable_drop=learnable_drop,    # 可学习drop配置
     ),
     # train_cfg=None,
     test_cfg=dict(use_knn=True, knn=7, search=7, sigma=1.0, cutoff=2.0))
