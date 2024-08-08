@@ -113,7 +113,7 @@ class Pack3DDetInputs(BaseTransform):
                 - img
 
             - 'data_samples' (:obj:`Det3DDataSample`): The annotation info of
-              the sample.
+              the sample. 标注信息
         """
         # augtest
         if isinstance(results, list):

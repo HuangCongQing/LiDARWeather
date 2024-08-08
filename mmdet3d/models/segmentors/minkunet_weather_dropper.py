@@ -134,7 +134,9 @@ class MinkUNetWeatherDropper(EncoderDecoder3D):
         mean_increase = current_loss_unc - last_loss_unc
         return mean_increase
 
-    # 
+    # 返回True和False
+    # select_action- 将根据 epsilon-greedy策略选择一个行为。 简而言之，我们有时会使用我们的模型来选择行为，有时我们只会对其中一个进行统一采样。 
+    # 选择随机行为的概率将从EPS_START开始，并朝EPS_END呈指数衰减。 EPS_DECAY控制衰减率。
     def select_action(self, state, points):
         """Return the point index to drop based on epsilon-greedy strategy."""
         # global steps_done
@@ -157,11 +159,14 @@ class MinkUNetWeatherDropper(EncoderDecoder3D):
         batch_data_samples = cache['batch_data_samples']
 
         enum_list, mask_list, points_list, action_list = [], [], [], []
+        # 遍历每个batch
         for i in range(len(batch_inputs['points'])):
-            enum = torch.tensor([i]*len(batch_inputs['points'][i]))
+            enum = torch.tensor([i]*len(batch_inputs['points'][i]))# ？？？？
             mask = batch_data_samples[i].gt_pts_seg.pts_semantic_mask
             points = batch_inputs['points'][i]
+            # tensor([[5.0643, 2.3542]], device='cuda:0')
             state = torch.tensor([loss, uncertainty], device=points.device).reshape(1, -1)
+            # 选择action,是否要这个点==============================
             action = self.select_action(state, points).reshape(-1,)
             self.next_policy = action
 
@@ -181,6 +186,7 @@ class MinkUNetWeatherDropper(EncoderDecoder3D):
             points_idx = (enum == i)
             batch_inputs_out['points'].append(points[points_idx])
             batch_data_samples_out[i].set_data({'gt_pts_seg':PointData(**{'pts_semantic_mask': mask[points_idx]})})
+        # 重新voxel
         batch_inputs_out['voxels'] = self.data_preprocessor.voxelize(batch_inputs_out['points'], batch_data_samples_out)
         return batch_inputs_out, batch_data_samples_out, action, state
 
@@ -223,7 +229,9 @@ class MinkUNetWeatherDropper(EncoderDecoder3D):
         """
         losses = dict()
 
+        # step1: backbone
         voxel_dict = self.extract_feat(batch_inputs_dict)
+        # step2: （head logit + loss）计算
         loss_decode = self._decode_head_forward_train(voxel_dict,
                                                     batch_data_samples)
         losses.update(loss_decode)
@@ -233,26 +241,32 @@ class MinkUNetWeatherDropper(EncoderDecoder3D):
                 voxel_dict, batch_data_samples)
             losses.update(loss_aux)
 
+        # 使用LPD策略
         if self.learnable_drop:
+            # backbone的输出
             voxel_dict = self.extract_feat(batch_inputs_dict)
             with torch.no_grad():
+                # 对head输出的logit进行softmax
                 logits_softmax = F.softmax(self.decode_head(voxel_dict)['logits'], dim=1)
                 self.cache = {
-                    'batch_inputs' : batch_inputs_dict,
-                    'batch_data_samples' : batch_data_samples,
-                    'loss' : loss_decode['decode.loss_ce'],
-                    'uncertainty' : torch.mean(torch.sum(-logits_softmax*torch.log(logits_softmax + 1e-8), dim=1)),
+                    'batch_inputs' : batch_inputs_dict, # 输入
+                    'batch_data_samples' : batch_data_samples, # 包含GT信息
+                    'loss' : loss_decode['decode.loss_ce'], # 正常loss
+                    'uncertainty' : torch.mean(torch.sum(-logits_softmax*torch.log(logits_softmax + 1e-8), dim=1)), # 不确定性tensor(2.3542, device='cuda:0')
                 }
-                # 调用
+                # 调用将输入drop
                 batch_inputs_dict_drop, batch_data_samples_drop, action, state = self.get_drop_points(self.cache)
+            # 针对drop后的点重新跑backbone
             voxel_dict_drop = self.extract_feat(batch_inputs_dict_drop)
+            # add loss1（针对采样后的point再进行一次loss）
             loss_drop = self._decode_head_forward_train(voxel_dict_drop, batch_data_samples_drop)
             loss_drop = rename_loss_dict('drop_', loss_drop)
-            # add loss1
             losses.update(loss_drop)
             with torch.no_grad():
+                # 对head输出的logit进行softmax
                 logits_softmax_drop = F.softmax(self.decode_head(voxel_dict_drop)['logits'], dim=1)
                 uncertainty_drop = torch.mean(torch.sum(-logits_softmax_drop*torch.log(logits_softmax_drop + 1e-8), dim=1))
+                # 下一个状态
                 next_state = torch.tensor([loss_drop['drop_decode.loss_ce'], uncertainty_drop], device=batch_inputs_dict['points'][0].device).reshape(1, -1)
                 # 计算奖励
                 reward = self.calculate_reward(loss_decode['decode.loss_ce'], loss_drop['drop_decode.loss_ce'])
@@ -261,10 +275,11 @@ class MinkUNetWeatherDropper(EncoderDecoder3D):
             # Policy net update
             if len(self.memory) > self.BATCH_SIZE:
                 loss_policy = self.update_policy_net(batch_inputs_dict)
-                # add loss2
+                # add loss2（Huber损失）
                 losses.update(loss_policy)
         return losses
     
+    # 更新policy网络
     def update_policy_net(self, batch_inputs_dict: dict):
         """Update the policy network based on sampled transitions."""
         transitions = self.memory.sample(self.BATCH_SIZE)
@@ -277,9 +292,12 @@ class MinkUNetWeatherDropper(EncoderDecoder3D):
         state_action_values_list = []
         expected_state_action_values_list = []
 
+        # 遍历每个batch
         for i in range(len(batch_inputs_dict['points'])):
+            # 运行policy_net
             state_action_values = self.policy_net(state_batch[i].reshape(1, -1), batch_inputs_dict['points'][i])
             with torch.no_grad():
+                # 运行target_net
                 next_state_values = self.target_net(non_final_next_states[i].reshape(1, -1), batch_inputs_dict['points'][i])
             expected_state_action_values = (next_state_values * self.GAMMA) + reward_batch[i]
             state_action_values_list.append(state_action_values)
@@ -287,7 +305,7 @@ class MinkUNetWeatherDropper(EncoderDecoder3D):
 
         state_action_values = torch.cat(state_action_values_list, dim=0)
         expected_state_action_values = torch.cat(expected_state_action_values_list, dim=0)
-
+        # 计算Huber损失loss
         loss_policy = {'dqn_loss': F.smooth_l1_loss(state_action_values, expected_state_action_values.detach())}
         return loss_policy
 

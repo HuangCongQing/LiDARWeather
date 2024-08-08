@@ -108,6 +108,7 @@ class Base3DDecodeHead(BaseModule, metaclass=ABCMeta):
         """Build Convolutional Segmentation Layers."""
         return nn.Conv1d(channels, num_classes, kernel_size=kernel_size)
 
+    # 对每个点分类by `nn.Conv1d`
     def cls_seg(self, feat: Tensor) -> Tensor:
         """Classify each points."""
         if self.dropout is not None:
