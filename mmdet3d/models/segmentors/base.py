@@ -98,6 +98,7 @@ class Base3DSegmentor(BaseModel, metaclass=ABCMeta):
             - If ``mode="predict"``, return a list of :obj:`Det3DDataSample`.
             - If ``mode="loss"``, return a dict of tensor.
         """
+        # 注意三者区别
         if mode == 'loss':
             return self.loss(inputs, data_samples)
         elif mode == 'predict':

@@ -10,7 +10,7 @@ from mmdet3d.structures.det3d_data_sample import SampleList
 from .decode_head import Base3DDecodeHead
 from mmdet3d.utils.typing_utils import ConfigType
 
-
+# 分割头
 @MODELS.register_module()
 class MinkUNetHead(Base3DDecodeHead):
     r"""MinkUNet decoder head with TorchSparse backend.
@@ -36,7 +36,8 @@ class MinkUNetHead(Base3DDecodeHead):
         logits = self.cls_seg(voxel_dict['voxel_feats'])
         voxel_dict['logits'] = logits
         return voxel_dict
-
+    
+    # loss计算
     def loss(self, inputs: dict, batch_data_samples: SampleList,
             train_cfg: ConfigType) -> Dict[str, Tensor]:
         """Forward function for training.
@@ -51,7 +52,9 @@ class MinkUNetHead(Base3DDecodeHead):
         Returns:
             Dict[str, Tensor]: A dictionary of loss components.
         """
+        # 获得logit
         seg_logits = self.forward(inputs)
+        # 计算loss
         losses = self.loss_by_feat(seg_logits, batch_data_samples)
         return losses
     

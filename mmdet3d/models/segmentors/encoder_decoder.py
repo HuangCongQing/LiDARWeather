@@ -155,6 +155,7 @@ class EncoderDecoder3D(Base3DSegmentor):
                                               self.test_cfg)
         return seg_logits
 
+    # 自己重构
     def _decode_head_forward_train(
             self, batch_inputs_dict: dict,
             batch_data_samples: SampleList,

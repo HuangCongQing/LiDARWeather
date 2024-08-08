@@ -9,7 +9,7 @@ from mmdet3d.registry import MODELS
 from mmdet3d.structures.det3d_data_sample import SampleList
 from mmdet3d.utils import ConfigType, OptConfigType
 
-
+# range_image 分割头
 @MODELS.register_module()
 class RangeImageHead(Base3DDecodeHead):
     """RangeImage decoder head.
