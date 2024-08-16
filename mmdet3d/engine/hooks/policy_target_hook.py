@@ -5,7 +5,7 @@ import torch
 
 from typing import Optional, Union
 DATA_BATCH = Optional[Union[dict, tuple, list]]
-
+# PolicyTargetHook!!!
 @HOOKS.register_module()
 class PolicyTargetHook(Hook):
     def __init__(self, dataset_name='semantickitti', train_start_iter=32):
